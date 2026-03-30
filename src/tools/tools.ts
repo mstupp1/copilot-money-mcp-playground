@@ -850,6 +850,8 @@ export class CopilotMoneyTools {
   ): Promise<{
     count: number;
     total_balance: number;
+    total_assets: number;
+    total_liabilities: number;
     accounts: Account[];
   }> {
     const { account_type, include_hidden = false } = options;
@@ -867,17 +869,23 @@ export class CopilotMoneyTools {
       accounts = accounts.filter((acc) => !hiddenIds.has(acc.account_id));
     }
 
-    // Calculate total balance (subtract debt from net worth)
-    const totalBalance = accounts.reduce((sum, acc) => {
+    // Calculate totals by asset/liability classification
+    let totalAssets = 0;
+    let totalLiabilities = 0;
+    for (const acc of accounts) {
       if (acc.account_type === 'loan' || acc.account_type === 'credit') {
-        return sum - acc.current_balance; // Subtract debt
+        totalLiabilities += acc.current_balance;
+      } else {
+        totalAssets += acc.current_balance;
       }
-      return sum + acc.current_balance; // Add assets
-    }, 0);
+    }
+    const totalBalance = totalAssets - totalLiabilities;
 
     return {
       count: accounts.length,
       total_balance: roundAmount(totalBalance),
+      total_assets: roundAmount(totalAssets),
+      total_liabilities: roundAmount(totalLiabilities),
       accounts,
     };
   }
@@ -2095,8 +2103,9 @@ export function createToolSchemas(): ToolSchema[] {
     {
       name: 'get_accounts',
       description:
-        'Get all accounts with balances. Optionally filter by account type ' +
-        '(checking, savings, credit, investment). Now checks both account_type ' +
+        'Get all accounts with balances, plus summary fields: total_balance (net worth = assets minus liabilities), ' +
+        'total_assets, and total_liabilities. Optionally filter by account type ' +
+        '(checking, savings, credit, investment). Checks both account_type ' +
         'and subtype fields for better filtering (e.g., finds checking accounts ' +
         "even when account_type is 'depository'). By default, hidden accounts are excluded.",
       inputSchema: {
@@ -2105,7 +2114,8 @@ export function createToolSchemas(): ToolSchema[] {
           account_type: {
             type: 'string',
             description:
-              'Filter by account type (checking, savings, credit, investment, depository)',
+              'Filter by account type (checking, savings, credit, loan, investment, depository). ' +
+              'Note: summary totals (total_assets, total_liabilities, total_balance) reflect only the filtered subset.',
           },
           include_hidden: {
             type: 'boolean',
