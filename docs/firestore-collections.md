@@ -83,7 +83,7 @@ collection === target || collection.endsWith(`/${target}`)
 | `amount` | number | Transaction amount (negative = expense, positive = income) |
 | `date` | string | Transaction date (YYYY-MM-DD) |
 | `name` | string | Display name (user-edited or cleaned) |
-| `display_name` | string | Alternate display name |
+| `display_name` | string | **Computed, not stored.** Added by `withDisplayName()` at read time |
 | `original_name` | string | Raw merchant name from bank |
 | `original_clean_name` | string | Bank-cleaned version |
 | `original_date` | string | Original date before edits |
@@ -100,7 +100,7 @@ collection === target || collection.endsWith(`/${target}`)
 | `user_reviewed` | boolean | User has reviewed this transaction |
 | `excluded` | boolean | Excluded from reports |
 | `plaid_deleted` | boolean | Deleted from Plaid |
-| `is_internal_transfer` | boolean | Marked as internal transfer (vs regular) |
+| `internal_transfer` | boolean | Marked as internal transfer (vs regular) |
 | `is_amazon` | boolean | Amazon transaction flag |
 | `from_investment` | string | Investment-related flag |
 | `payee` | object | `{ name: string }` - who received money |
@@ -136,7 +136,7 @@ collection === target || collection.endsWith(`/${target}`)
 | `account_id` | string | Unique identifier |
 | `name` | string | Account name |
 | `official_name` | string | Official name from institution |
-| `type` | string | Account type: `depository`, `credit`, `investment`, `loan`, `brokerage` |
+| `account_type` | string | Account type: `depository`, `credit`, `investment`, `loan`, `brokerage` |
 | `subtype` | string | Subtype: `checking`, `savings`, `credit card`, `401k`, `brokerage`, etc. |
 | `mask` | string | Last 4 digits of account number |
 | `current_balance` | number | Current balance |
@@ -519,7 +519,7 @@ Monthly time-weighted return (TWR) data per security. Document ID is the month (
 
 ---
 
-### `amazon/{user_id}/orders`
+### `amazon/{id}/orders`
 
 **72 documents** | **Low priority - Copilot Labs feature (currently Off)**
 
@@ -655,8 +655,8 @@ Maps user ID to their Plaid item IDs. Document ID is the user ID, fields are ite
 
 ```json
 {
-  "k1Eww8kakdUvQoZXkopjI5XPnw3nLBuRANMdp": true,
-  "BnXp1XP03QTyJMb1yD3YUjJxgY7ywkH9QVw50": true
+  "plaid_item_id_example_1": true,
+  "plaid_item_id_example_2": true
 }
 ```
 
