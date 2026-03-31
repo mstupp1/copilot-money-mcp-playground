@@ -122,7 +122,7 @@ collection === target || collection.endsWith(`/${target}`)
 **App-visible fields not stored directly:**
 - "Similar transactions" - computed by matching `name`/`original_name`
 - "Split" - creates child transactions with parent reference
-- Transaction type ("Regular" vs "Internal Transfer") maps to `is_internal_transfer`
+- Transaction type ("Regular" vs "Internal Transfer") maps to `internal_transfer`
 
 ---
 
