@@ -80,7 +80,7 @@ collection === target || collection.endsWith(`/${target}`)
 | Field | Type | Description |
 |---|---|---|
 | `transaction_id` | string | Unique identifier (= Firestore doc ID) |
-| `amount` | number | Transaction amount (negative = expense, positive = income) |
+| `amount` | number | Transaction amount (positive = expense, negative = income/credit) |
 | `date` | string | Transaction date (YYYY-MM-DD) |
 | `name` | string | Display name (user-edited or cleaned) |
 | `display_name` | string | **Computed, not stored.** Added by `withDisplayName()` at read time |
@@ -719,8 +719,10 @@ Both end with `/accounts`. Check for user accounts (`users/{user_id}/accounts`) 
 Goals store config (target, rate). Progress (`current_amount`) is in `financial_goal_history`. Must join to get complete state.
 
 ### 4. Amount Sign Convention
-- Expenses: negative amounts
-- Income: positive amounts
+- Expenses: **positive** amounts (e.g., a $50 purchase is stored as `50`)
+- Income/credits/refunds: **negative** amounts (e.g., a $1000 paycheck is stored as `-1000`)
+- This is the **opposite of standard accounting convention** but matches Plaid's format
+- The app UI flips the sign for display (shows "-$50" for expenses, "+$1000" for income)
 
 ### 5. Pending Transaction Reconciliation
 When a charge posts, two versions coexist. The posted version has `pending_transaction_id` pointing to the pending one. Reconcile by dropping superseded pending transactions.
