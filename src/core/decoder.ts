@@ -31,6 +31,12 @@ import {
 } from '../models/investment-performance.js';
 import { PlaidAccount, PlaidAccountSchema } from '../models/plaid-account.js';
 import { BalanceHistory, BalanceHistorySchema } from '../models/balance-history.js';
+import {
+  HoldingsHistoryMeta,
+  HoldingsHistoryMetaSchema,
+  HoldingsHistory,
+  HoldingsHistorySchema,
+} from '../models/holdings-history.js';
 
 /**
  * Extract a primitive value from a FirestoreValue.
@@ -678,6 +684,8 @@ export interface AllCollectionsResult {
   twrHoldings: TwrHolding[];
   plaidAccounts: PlaidAccount[];
   balanceHistory: BalanceHistory[];
+  holdingsHistoryMeta: HoldingsHistoryMeta[];
+  holdingsHistory: HoldingsHistory[];
 }
 
 /**
@@ -1489,6 +1497,109 @@ function processBalanceHistory(
 }
 
 /**
+ * Internal helper to process a holdings_history metadata document.
+ * Path: items/{item_id}/accounts/{account_id}/holdings_history/{hash}
+ */
+function processHoldingsHistoryMeta(
+  fields: Map<string, FirestoreValue>,
+  docId: string,
+  collection: string
+): HoldingsHistoryMeta | null {
+  const data: Record<string, unknown> = {};
+
+  data.holdings_history_id = docId;
+  data.security_id = docId;
+
+  // Extract item_id and account_id from path
+  const parts = collection.split('/');
+  const itemsIdx = parts.indexOf('items');
+  if (itemsIdx >= 0 && itemsIdx + 1 < parts.length) {
+    data.item_id = parts[itemsIdx + 1] ?? 'unknown';
+  }
+  const accountsIdx = parts.indexOf('accounts');
+  if (accountsIdx >= 0 && accountsIdx + 1 < parts.length) {
+    data.account_id = parts[accountsIdx + 1] ?? 'unknown';
+  }
+
+  // Extract any other fields generically
+  for (const [key, val] of fields) {
+    if (!(key in data)) {
+      const extracted = extractValue(val);
+      if (extracted !== undefined) data[key] = extracted;
+    }
+  }
+
+  const validated = HoldingsHistoryMetaSchema.safeParse(data);
+  return validated.success ? validated.data : null;
+}
+
+/**
+ * Internal helper to process a holdings_history history document.
+ * Path: items/{item_id}/accounts/{account_id}/holdings_history/{hash}/history/{month}
+ */
+function processHoldingsHistory(
+  fields: Map<string, FirestoreValue>,
+  docId: string,
+  collection: string
+): HoldingsHistory | null {
+  const data: Record<string, unknown> = {};
+
+  // Extract security_id from path (the holdings_history/{hash} part)
+  const parts = collection.split('/');
+  const hhIdx = parts.indexOf('holdings_history');
+  let securityHash = 'unknown';
+  if (hhIdx >= 0 && hhIdx + 1 < parts.length) {
+    securityHash = parts[hhIdx + 1] ?? 'unknown';
+    data.security_id = securityHash;
+  }
+
+  data.history_id = `${securityHash}:${docId}`;
+  data.month = docId;
+
+  // Extract item_id and account_id from path
+  const itemsIdx = parts.indexOf('items');
+  if (itemsIdx >= 0 && itemsIdx + 1 < parts.length) {
+    data.item_id = parts[itemsIdx + 1] ?? 'unknown';
+  }
+  const accountsIdx = parts.indexOf('accounts');
+  if (accountsIdx >= 0 && accountsIdx + 1 < parts.length) {
+    data.account_id = parts[accountsIdx + 1] ?? 'unknown';
+  }
+
+  // Extract history map: epoch-ms keyed { price, quantity } entries
+  const historyMap = getMap(fields, 'history');
+  if (historyMap) {
+    const history: Record<string, { price?: number; quantity?: number }> = {};
+    for (const [epochKey, val] of historyMap) {
+      if (val.type === 'map') {
+        const entry: { price?: number; quantity?: number } = {};
+        const priceField = val.value.get('price');
+        if (priceField && (priceField.type === 'double' || priceField.type === 'integer')) {
+          entry.price = priceField.value;
+        }
+        const qtyField = val.value.get('quantity');
+        if (qtyField && (qtyField.type === 'double' || qtyField.type === 'integer')) {
+          entry.quantity = qtyField.value;
+        }
+        history[epochKey] = entry;
+      }
+    }
+    if (Object.keys(history).length > 0) data.history = history;
+  }
+
+  // Extract any other fields generically (skip 'history' already handled)
+  for (const [key, val] of fields) {
+    if (key !== 'history' && !(key in data)) {
+      const extracted = extractValue(val);
+      if (extracted !== undefined) data[key] = extracted;
+    }
+  }
+
+  const validated = HoldingsHistorySchema.safeParse(data);
+  return validated.success ? validated.data : null;
+}
+
+/**
  * Helper to check if a collection path matches a target collection name.
  * Handles both simple names ("transactions") and full paths ("users/{user_id}/transactions").
  */
@@ -1521,6 +1632,8 @@ export async function decodeAllCollections(dbPath: string): Promise<AllCollectio
   const rawTwrHoldings: TwrHolding[] = [];
   const rawPlaidAccounts: PlaidAccount[] = [];
   const rawBalanceHistory: BalanceHistory[] = [];
+  const rawHoldingsHistoryMeta: HoldingsHistoryMeta[] = [];
+  const rawHoldingsHistory: HoldingsHistory[] = [];
 
   // Single pass through the database
   for await (const doc of iterateDocuments(dbPath)) {
@@ -1531,6 +1644,12 @@ export async function decodeAllCollections(dbPath: string): Promise<AllCollectio
     if (collection.includes('users/') && collection.endsWith('/accounts')) {
       const userAccount = processUserAccount(fields, documentId, collection);
       if (userAccount) rawUserAccounts.push(userAccount);
+    } else if (collection.includes('/holdings_history/') && collection.endsWith('/history')) {
+      const hh = processHoldingsHistory(fields, documentId, collection);
+      if (hh) rawHoldingsHistory.push(hh);
+    } else if (collection.includes('/holdings_history') && !collection.endsWith('/history')) {
+      const hhm = processHoldingsHistoryMeta(fields, documentId, collection);
+      if (hhm) rawHoldingsHistoryMeta.push(hhm);
     } else if (collection.endsWith('/balance_history')) {
       const bh = processBalanceHistory(fields, documentId, collection);
       if (bh) rawBalanceHistory.push(bh);
@@ -1796,6 +1915,26 @@ export async function decodeAllCollections(dbPath: string): Promise<AllCollectio
     return dateB.localeCompare(dateA);
   });
 
+  // Holdings history meta: dedupe by holdings_history_id
+  const hhMetaSeen = new Set<string>();
+  const holdingsHistoryMeta: HoldingsHistoryMeta[] = [];
+  for (const hhm of rawHoldingsHistoryMeta) {
+    if (!hhMetaSeen.has(hhm.holdings_history_id)) {
+      hhMetaSeen.add(hhm.holdings_history_id);
+      holdingsHistoryMeta.push(hhm);
+    }
+  }
+
+  // Holdings history: dedupe by history_id
+  const hhSeen = new Set<string>();
+  const holdingsHistory: HoldingsHistory[] = [];
+  for (const hh of rawHoldingsHistory) {
+    if (!hhSeen.has(hh.history_id)) {
+      hhSeen.add(hh.history_id);
+      holdingsHistory.push(hh);
+    }
+  }
+
   return {
     transactions,
     accounts,
@@ -1812,6 +1951,8 @@ export async function decodeAllCollections(dbPath: string): Promise<AllCollectio
     twrHoldings,
     plaidAccounts,
     balanceHistory,
+    holdingsHistoryMeta,
+    holdingsHistory,
   };
 }
 

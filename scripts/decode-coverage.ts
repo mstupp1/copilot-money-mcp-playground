@@ -79,6 +79,8 @@ function normalizeCollectionPath(collection: string): string {
 function isDecoded(rawCollection: string): boolean {
   // Mirror the exact if/else order from decodeAllCollections:
   if (rawCollection.includes('users/') && rawCollection.endsWith('/accounts')) return true;
+  if (rawCollection.includes('/holdings_history/') && rawCollection.endsWith('/history')) return true;
+  if (rawCollection.includes('/holdings_history') && !rawCollection.endsWith('/history')) return true;
   if (rawCollection.endsWith('/balance_history')) return true;
   if (
     rawCollection.includes('items/') &&

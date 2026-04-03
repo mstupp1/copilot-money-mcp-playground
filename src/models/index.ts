@@ -105,6 +105,13 @@ export { PlaidAccountSchema, type PlaidAccount, type Holding } from './plaid-acc
 export { BalanceHistorySchema, type BalanceHistory } from './balance-history.js';
 
 export {
+  HoldingsHistoryMetaSchema,
+  type HoldingsHistoryMeta,
+  HoldingsHistorySchema,
+  type HoldingsHistory,
+} from './holdings-history.js';
+
+export {
   type CategoryNode,
   getCategory,
   getCategoryPath,
