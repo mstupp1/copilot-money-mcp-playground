@@ -47,6 +47,7 @@ import {
   AccountChangeSchema,
 } from '../models/change.js';
 import { Security, SecuritySchema } from '../models/security.js';
+import { UserProfile, UserProfileSchema } from '../models/user-profile.js';
 
 /**
  * Extract a primitive value from a FirestoreValue.
@@ -700,6 +701,7 @@ export interface AllCollectionsResult {
   transactionChanges: TransactionChange[];
   accountChanges: AccountChange[];
   securities: Security[];
+  userProfiles: UserProfile[];
 }
 
 /**
@@ -1702,6 +1704,63 @@ function processSecurity(fields: Map<string, FirestoreValue>, docId: string): Se
 }
 
 /**
+ * Internal helper to process a user profile document.
+ */
+function processUserProfile(
+  fields: Map<string, FirestoreValue>,
+  docId: string
+): UserProfile | null {
+  // Skip sentinel/parent-pointer docs that have no meaningful data
+  if (fields.size === 0) return null;
+
+  const data: Record<string, unknown> = { user_id: docId };
+
+  const stringFields = [
+    'public_id',
+    'last_cold_open',
+    'last_warm_open',
+    'last_month_reviewed',
+    'last_year_reviewed',
+    'account_creation_timestamp',
+    'onboarding_completed_timestamp',
+    'onboarding_last_completed_step',
+  ];
+  for (const field of stringFields) {
+    const value = getString(fields, field);
+    if (value !== undefined) data[field] = value;
+  }
+
+  const numericFields = [
+    'service_ends_on_ms',
+    'items_disconnect_on_ms',
+    'intelligence_categories_review_count',
+  ];
+  for (const field of numericFields) {
+    const value = getNumber(fields, field);
+    if (value !== undefined) data[field] = value;
+  }
+
+  const booleanFields = [
+    'budgeting_enabled',
+    'authentication_required',
+    'data_initialized',
+    'onboarding_completed',
+    'logged_out',
+    'match_internal_txs_enabled',
+    'rollovers_enabled',
+    'investments_performance_initialized',
+    'finance_goals_monthly_summary_mode_enabled',
+  ];
+  for (const field of booleanFields) {
+    const value = getBoolean(fields, field);
+    if (value !== undefined) data[field] = value;
+  }
+
+  const validated = UserProfileSchema.safeParse(data);
+  return validated.success ? validated.data : null;
+}
+
+/**
  * Helper to check if a collection path matches a target collection name.
  * Handles both simple names ("transactions") and full paths ("users/{user_id}/transactions").
  */
@@ -1740,6 +1799,7 @@ export async function decodeAllCollections(dbPath: string): Promise<AllCollectio
   const rawTransactionChanges: TransactionChange[] = [];
   const rawAccountChanges: AccountChange[] = [];
   const rawSecurities: Security[] = [];
+  const rawUserProfiles: UserProfile[] = [];
 
   // Single pass through the database
   for await (const doc of iterateDocuments(dbPath)) {
@@ -1828,6 +1888,10 @@ export async function decodeAllCollections(dbPath: string): Promise<AllCollectio
     } else if (collectionMatches(collection, 'securities')) {
       const security = processSecurity(fields, documentId);
       if (security) rawSecurities.push(security);
+    } else if (collectionMatches(collection, 'users') || /^users\/[^/]+$/.test(collection)) {
+      // Match both top-level users and users/{user_id} parent-pointer sentinel docs.
+      const profile = processUserProfile(fields, documentId);
+      if (profile) rawUserProfiles.push(profile);
     }
   }
 
@@ -2091,6 +2155,16 @@ export async function decodeAllCollections(dbPath: string): Promise<AllCollectio
     }
   }
 
+  // User profiles: dedupe by user_id
+  const profileSeen = new Set<string>();
+  const userProfiles: UserProfile[] = [];
+  for (const profile of rawUserProfiles) {
+    if (!profileSeen.has(profile.user_id)) {
+      profileSeen.add(profile.user_id);
+      userProfiles.push(profile);
+    }
+  }
+
   return {
     transactions,
     accounts,
@@ -2113,6 +2187,7 @@ export async function decodeAllCollections(dbPath: string): Promise<AllCollectio
     transactionChanges,
     accountChanges,
     securities,
+    userProfiles,
   };
 }
 

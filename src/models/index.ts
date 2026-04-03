@@ -106,6 +106,8 @@ export { BalanceHistorySchema, type BalanceHistory } from './balance-history.js'
 
 export { SecuritySchema, type Security } from './security.js';
 
+export { UserProfileSchema, type UserProfile } from './user-profile.js';
+
 export {
   HoldingsHistoryMetaSchema,
   type HoldingsHistoryMeta,
