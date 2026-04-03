@@ -1568,7 +1568,9 @@ export async function decodeAllCollections(dbPath: string): Promise<AllCollectio
     } else if (collectionMatches(collection, 'investment_splits')) {
       const split = processInvestmentSplit(fields, documentId);
       if (split) rawInvestmentSplits.push(split);
-    } else if (collectionMatches(collection, 'items')) {
+    } else if (collectionMatches(collection, 'items') || /^items\/[^/]+$/.test(collection)) {
+      // Match both top-level items and items/{item_id} parent-pointer docs.
+      // Parent-pointer docs (items/{item_id}) have empty fields and processItem returns null.
       const item = processItem(fields, documentId);
       if (item) rawItems.push(item);
     } else if (collectionMatches(collection, 'categories')) {

@@ -99,7 +99,8 @@ function isDecoded(rawCollection: string): boolean {
   )
     return true;
   if (collectionMatches(rawCollection, 'investment_splits')) return true;
-  if (collectionMatches(rawCollection, 'items')) return true;
+  if (collectionMatches(rawCollection, 'items') || /^items\/[^/]+$/.test(rawCollection))
+    return true;
   if (collectionMatches(rawCollection, 'categories')) return true;
 
   return false;
