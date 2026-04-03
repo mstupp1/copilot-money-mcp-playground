@@ -2,7 +2,9 @@
 
 Complete documentation of all Firestore collections cached locally by Copilot Money. This is the authoritative reference for understanding the local LevelDB data, derived from systematic app screenshots and raw Firestore document inspection.
 
-**Last verified:** 2026-03-30 | **App version:** macOS (App Store) | **Total documents:** ~52,679 across ~35 unique collection patterns
+**Last verified:** 2026-04-02 | **App version:** macOS (App Store) | **Total documents:** ~55,953 across ~35 unique collection patterns
+
+**Decode coverage:** 55.3% (30,941 / 55,953 documents) — run `bun run scripts/decode-coverage.ts` for latest numbers
 
 ## Database Location
 
@@ -123,6 +125,8 @@ collection === target || collection.endsWith(`/${target}`)
 - "Similar transactions" - computed by matching `name`/`original_name`
 - "Split" - creates child transactions with parent reference
 - Transaction type ("Regular" vs "Internal Transfer") maps to `internal_transfer`
+- The Filter > Type menu shows 4 types: **Income** (negative amount / income category), **Internal Transfer** (`internal_transfer: true`), **Recurring** (linked to a recurring pattern), **Regular** (default). "Income" and "Recurring" are computed, not stored as separate fields.
+- Filter dimensions: Account, Category, Date, Goals, Keywords, Recurring, Review status, Tags, Type
 
 ---
 
@@ -152,7 +156,7 @@ collection === target || collection.endsWith(`/${target}`)
 **App-visible data from this collection:**
 - Balance chart uses `balance_history` subcollection (separate)
 - Account balance change % shown in list view
-- Credit limit shown as "/ $27,500.00" next to balance for credit cards
+- Credit limit shown next to balance for credit cards (e.g., "/ $XX,XXX.00")
 - "Goals" section on checking accounts links via `financial_goals.associated_accounts`
 
 ---
@@ -178,45 +182,58 @@ User overrides for account display. Must be checked BEFORE main `accounts` since
 **Path:** `users/{user_id}/recurring/{recurring_id}`
 **App view:** Recurrings list (This month / Overdue / In the future / Paused / Archived), Recurring detail panel
 
-| Field | Type | Description |
-|---|---|---|
-| `id` | string | Unique identifier (mapped to `recurring_id`) |
-| `name` | string | Display name (user-editable) |
-| `emoji` | string | Display emoji |
-| `amount` | number | Expected amount (positive = expense) |
-| `min_amount` | number | Minimum amount for matching range |
-| `max_amount` | number | Maximum amount for matching range |
-| `frequency` | string | See frequency values below |
-| `state` | string | `"active"`, `"paused"`, `"archived"` |
-| `latest_date` | string | Last payment date (YYYY-MM-DD) |
-| `category_id` | string | Internal category ID |
-| `plaid_category_id` | string | Plaid category ID |
-| `match_string` | string | Merchant name pattern for matching |
-| `transaction_ids` | string[] | Associated transaction IDs |
-| `included_transaction_ids` | string[] | Manually included |
-| `excluded_transaction_ids` | string[] | Manually excluded |
-| `days_filter` | number | Day of month filter for matching |
-| `skip_filter_update` | boolean | Skip automatic filter updates |
-| `identification_method` | string | Detection method (e.g., `"new_existing"`) |
-| `_origin` | string | Source (e.g., `"firebase"`) |
+| Field | Type | Description | In Schema? |
+|---|---|---|---|
+| `id` | string | Unique identifier (decoder maps to `recurring_id`) | Yes |
+| `name` | string | Display name (user-editable) | Yes |
+| `merchant_name` | string | Merchant name (fallback display name) | Yes |
+| `emoji` | string | Display emoji | Yes |
+| `amount` | number | Expected amount (positive = expense) | Yes |
+| `min_amount` | number | Minimum amount for matching range | Yes |
+| `max_amount` | number | Maximum amount for matching range | Yes |
+| `frequency` | string | See frequency values below | Yes |
+| `state` | string | `"active"`, `"paused"`, `"archived"` | Yes |
+| `is_active` | boolean | Legacy field, derived from `state` for compatibility | Yes |
+| `latest_date` | string | Last payment date (YYYY-MM-DD). Decoder maps to `last_date` | Yes (as `last_date`) |
+| `category_id` | string | Internal category ID | Yes |
+| `plaid_category_id` | string | Plaid category ID | Yes |
+| `account_id` | string | Account this recurring is charged to | Yes |
+| `match_string` | string | Merchant name pattern for matching | Yes |
+| `transaction_ids` | string[] | Associated transaction IDs | Yes |
+| `included_transaction_ids` | string[] | Manually included transaction IDs | No (dropped by strict schema) |
+| `excluded_transaction_ids` | string[] | Manually excluded transaction IDs | No (dropped by strict schema) |
+| `days_filter` | number | Day of month filter for matching | Yes |
+| `skip_filter_update` | boolean | Whether to skip automatic filter updates | No (dropped by strict schema) |
+| `identification_method` | string | Detection method (e.g., `"new_existing"`) | No (dropped by strict schema) |
+| `iso_currency_code` | string | Currency code | Yes |
+| `_origin` | string | Source (e.g., `"firebase"`) | No (dropped by strict schema) |
 
 **Frequency values:** `daily`, `weekly`, `biweekly`, `monthly`, `bimonthly`, `quarterly`, `quadmonthly`, `semiannually`, `annually`/`yearly`
 
+**Field name mapping quirks:**
+- Firestore stores `id`, decoder maps to `recurring_id`
+- Firestore stores `latest_date`, decoder maps to `last_date`
+- `next_date` is **computed** by the decoder from `latest_date` + `frequency`, not stored in Firestore (but the decoder also checks for an explicit `next_date` field as fallback)
+- `is_active` is derived from `state` by the decoder for backwards compatibility
+
 **App detail panel shows:**
-- RULES section: Named match pattern, amount range, day filter, frequency
+- Header: "Monthly recurring" (type + frequency)
+- Category badge, emoji + name, next payment amount + date
+- RULES section: Named match pattern (`match_string`), amount range (`min_amount` to `max_amount`), day filter (`days_filter`), frequency
 - Payment history chart (monthly amounts over time)
 - Key metrics: Spent per year, Avg transaction
-- Last account used (with balance)
-- Transaction history list
+- Last account used: account name + mask + balance
+- Transaction history list with ADD button
+- Three-dot menu: **Pause** (sets `state: "paused"`), **Archive** (sets `state: "archived"`), **Delete**
 
 **UI grouping:**
-- **This month**: Active with `latest_date` or calculated `next_date` in current month
+- **This month**: Active with `latest_date` or calculated `next_date` in current month; checkmark shows paid
 - **Overdue**: Active where `next_date` < today
 - **In the future**: Active where `next_date` > current month
 - **Paused**: `state: "paused"`
 - **Archived**: `state: "archived"`
 
-**`next_date` is NOT stored** - must be calculated from `latest_date` + `frequency`.
+**List item display:** date, emoji, name, frequency label, category badge, amount, paid checkmark
 
 ---
 
@@ -238,20 +255,55 @@ User overrides for account display. Must be checked BEFORE main `accounts` since
 ### `users/{user_id}/categories`
 
 **Path:** `users/{user_id}/categories/{category_id}`
-**App view:** Categories list with parent/child hierarchy, category detail panel
+**App view:** Categories list (Regular Categories / Excluded Categories), category detail panel
+**32 documents**
 
-| Field | Type | Description |
-|---|---|---|
-| `category_id` | string | Unique identifier |
-| `name` | string | Category name |
-| `emoji` | string | Display emoji |
-| `parent_id` | string | Parent category (for subcategories) |
-| `is_income` | boolean | Income category flag |
-| `order` | number | Display sort order |
+| Field | Type | Description | In Schema? |
+|---|---|---|---|
+| `category_id` | string | Unique identifier (= doc ID or `id` field) | Yes |
+| `name` | string | Category name (e.g., "Restaurants", "Car") | Yes |
+| `emoji` | string | Display emoji (e.g., "🍔", "🔧") | Yes |
+| `color` | string | Hex color for category dot/badge (e.g., "#8002E3") | Yes |
+| `bg_color` | string | Background color for badges (e.g., "#FAF5FD") | Yes |
+| `parent_category_id` | string | Parent category ID (for subcategories) | Yes |
+| `children_category_ids` | string[] | Child category IDs | Yes |
+| `order` | number | Display sort order within parent | Yes |
+| `excluded` | boolean | Excluded from spending reports | Yes |
+| `is_other` | boolean | Whether this is the "Other" catch-all category | Yes |
+| `auto_budget_lock` | boolean | Locked from automatic budget adjustments | Yes |
+| `auto_delete_lock` | boolean | Locked from automatic deletion | Yes |
+| `plaid_category_ids` | string[] | Plaid category IDs mapped to this custom category (e.g., `["18021000", "19025000"]`) | Yes |
+| `partial_name_rules` | string[] | Merchant name substrings for auto-categorization | Yes |
+| `user_id` | string | Owner user ID | Yes |
+| `budget_id` | string | Associated budget ID | No (in Firestore, not in schema) |
+| `children_categories` | unknown | Alternate children field | No (in Firestore, not in schema) |
+| `_origin` | string | Source (e.g., `"firebase"`) | No (dropped by strict schema) |
 
-**App shows:** Hierarchical tree (Food > Restaurants, Bars & Pubs, Groceries, Coffee), spending per category with bar charts, "Last" (previous month) comparison, Key metrics (spent per year, avg monthly), transaction list.
+**Category hierarchy:**
+- Parent categories have `children_category_ids` listing their subcategories
+- Subcategories have `parent_category_id` pointing to parent
+- Parent categories show a count badge (e.g., "4") in the UI
+- Standalone categories (Subscriptions, Transportation, Healthcare, etc.) have no parent or children
 
-**Note:** Copilot also uses Plaid's standard category taxonomy (hardcoded, not stored in Firestore).
+**Category sections in the app:**
+- **Regular Categories**: `excluded: false` (default). Shown hierarchically with parent > children.
+- **Excluded Categories**: `excluded: true`. Transactions in excluded categories don't count toward spending totals. (e.g., "Work")
+
+**Plaid category mapping:**
+- `plaid_category_ids` maps Plaid numeric IDs to this custom category for auto-categorization
+- `partial_name_rules` provides merchant-name-based auto-categorization
+- Copilot also has a hardcoded Plaid taxonomy (`src/utils/categories.ts`, `src/models/category-full.ts`)
+
+**Detail panel (for category groups):**
+- Color dot + emoji + name, subcategory badges
+- "Spent in [Month]" total, over-budget amount
+- Monthly spending bar chart (multi-year)
+- Key metrics: Spent per year, Avg monthly spend (2022-2026)
+- Transaction list for current month
+
+**Three-dot menu:** Ungroup categories, Spending category type (Regular / Excluded)
+
+**Note:** `is_income` does NOT exist in the Firestore data. Income is determined by the hardcoded Plaid taxonomy, not a category field. The old doc incorrectly listed this. Also, `parent_id` was wrong — the actual field name is `parent_category_id`.
 
 ---
 
@@ -465,7 +517,7 @@ Security reference data (stocks, ETFs, mutual funds, cash).
 | `next_update` | string | Expected next update time |
 | `update_frequency` | number | Update interval in seconds (300=5min, 86400=daily) |
 | `source` | string | Price source: `"polygon"`, `"eod"` |
-| `comparison` | boolean | Used as comparison benchmark |
+| `comparison` | boolean | Used as comparison benchmark (e.g., VOO for Performance vs Benchmark chart) |
 | `option_contract` | object/null | Options data |
 | `proxy_security_id` | string/null | Proxy security |
 | `trades_24_7` | boolean | 24/7 trading (crypto) |
@@ -527,13 +579,13 @@ Amazon order integration. Matches Amazon orders to bank transactions.
 
 | Field | Type | Description |
 |---|---|---|
-| `id` | string | Amazon order ID (e.g., "111-0005209-8579475") |
+| `id` | string | Amazon order ID (e.g., "111-XXXXXXX-XXXXXXX") |
 | `date` | string | Order date (YYYY-MM-DD) |
 | `account_id` | string | Linked bank account (hashed) |
 | `match_state` | string | `"AUTO"` - how order was matched to transactions |
 | `items` | array | Order items: `[{ id, name, price, quantity, link }]` |
 | `details` | object | `{ beforeTax, shipping, subtotal, tax, total }` |
-| `payment` | object | `{ card: "1178" }` - last 4 digits |
+| `payment` | object | `{ card: "XXXX" }` - last 4 digits of card |
 | `transactions` | array | Matched transaction IDs |
 | `copilot_tx` | object | Transaction-to-items mapping (keyed by tx ID) |
 
@@ -763,13 +815,17 @@ Securities are identified by SHA256 hashes (64 hex chars), NOT ticker symbols. T
 | Accounts list | `accounts`, `user accounts`, `items` | Merge with customizations |
 | Account detail | `accounts`, `balance_history`, `transactions`, `financial_goals` | Chart + transactions + linked goals |
 | Investments overview | `accounts` (investment type), `securities` | Filter investment accounts |
-| Investment account detail | `accounts`, `holdings`, `securities`, `investment_prices` | Holdings + allocation |
+| Investments - Performance vs Benchmark | `investment_performance/*/twr_holding`, `securities` (where `comparison: true`) | TWR data + benchmark security (e.g., VOO) |
+| Investments - Allocation | `holdings`, `securities` | Group by `securities.type` (Equity/ETF/Mutual Fund/Cash) |
+| Investments - Settings | `users` | Live balance estimate toggle, benchmark selection, included accounts |
+| Investment account detail | `accounts`, `holdings`, `securities`, `investment_prices` | Holdings + per-account allocation |
 | Security detail | `securities`, `investment_prices`, `holdings`, `twr_holding` | Price chart + metrics + positions |
 | Categories list | `categories`, `transactions`, `budgets` | Hierarchical with spending |
 | Category detail | `categories`, `transactions` | Spending + key metrics + tx list |
 | Recurrings list | `recurring` | Grouped by state + payment status |
 | Recurring detail | `recurring`, `transactions`, `accounts` | Rules + chart + history |
 | Settings - Tags | `tags` | Tag list with colors |
+| Settings - Connections | `items`, `items/*/accounts` | Institution list with linked date, account count, status (needs attention / healthy) |
 | Settings - General | `users` | User preferences |
 
 ---
