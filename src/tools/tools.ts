@@ -131,6 +131,12 @@ export const UNREALISTIC_AMOUNT_THRESHOLD = 1_000_000;
 export const MAX_VALID_AMOUNT = 10_000_000;
 
 /**
+ * Maximum number of concurrent Firestore writes when reviewing transactions.
+ * Batching prevents overwhelming Firestore with a large number of simultaneous requests.
+ */
+export const REVIEW_BATCH_SIZE = 10;
+
+/**
  * Accepted frequency values for creating recurring items.
  * Subset of KNOWN_FREQUENCIES from the model -- only user-facing values.
  */
@@ -2567,19 +2573,22 @@ export class CopilotMoneyTools {
       resolvedTxns.push(txn);
     }
 
-    // Write to Firestore in parallel and patch cache
+    // Batch writes to avoid overwhelming Firestore (max REVIEW_BATCH_SIZE concurrent)
     const firestoreFields = toFirestoreFields({ user_reviewed: reviewed });
-    await Promise.all(
-      resolvedTxns.map(async (txn) => {
-        const collectionPath = `items/${txn.item_id}/accounts/${txn.account_id}/transactions`;
-        await client.updateDocument(collectionPath, txn.transaction_id, firestoreFields, [
-          'user_reviewed',
-        ]);
-        if (!this.db.patchCachedTransaction(txn.transaction_id, { user_reviewed: reviewed })) {
-          this.db.clearCache();
-        }
-      })
-    );
+    for (let i = 0; i < resolvedTxns.length; i += REVIEW_BATCH_SIZE) {
+      const batch = resolvedTxns.slice(i, i + REVIEW_BATCH_SIZE);
+      await Promise.all(
+        batch.map(async (txn) => {
+          const collectionPath = `items/${txn.item_id}/accounts/${txn.account_id}/transactions`;
+          await client.updateDocument(collectionPath, txn.transaction_id, firestoreFields, [
+            'user_reviewed',
+          ]);
+          if (!this.db.patchCachedTransaction(txn.transaction_id, { user_reviewed: reviewed })) {
+            this.db.clearCache();
+          }
+        })
+      );
+    }
 
     return {
       success: true,
