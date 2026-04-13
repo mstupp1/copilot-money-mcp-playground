@@ -148,11 +148,14 @@ Do:
 - Mention pending transactions when present
 - End with a takeaway only if it is meaningful
 - In Monday mode, make the message feel like a weekly briefing with slightly more synthesis and slightly less transaction detail
+- Keep the message conversational when a list does not improve clarity
+- If you list expenses, use a plain list rather than decorative labels or over-structured blocks
 
 Do not:
 - List every transaction by default
 - Fill space with generic advice
 - Force a takeaway when nothing stands out
+- Turn simple spend mentions into bullets unless the bullets are doing real summary work
 
 ## Transaction Listing Policy
 
@@ -162,6 +165,16 @@ Only list individual transactions when they add information. Good reasons:
 - A large charge or odd purchase is the point of the recap
 
 Otherwise summarize by category and behavior shape.
+
+When listing does help:
+- Use a plain list of expenses
+- Keep each line short and factual
+- Do not add extra formatting unless the list itself is the summary
+
+When listing does not help:
+- Fold spend mentions into normal sentences
+- Prefer conversational summary over a mechanical breakdown
+- Mention only the one or two details that actually explain the day or week
 
 ## No-Spend Days
 
@@ -219,6 +232,7 @@ Main drivers:
 Formatting guidance:
 - Plain text is fine when the day is simple
 - Use bullets when there are 2-3 distinct drivers or flags worth separating
+- If bullets are used for expenses, keep them plain and utilitarian
 - If emojis help, use them according to `skills/finance-base/SKILL.md`
 
 ## Rules
