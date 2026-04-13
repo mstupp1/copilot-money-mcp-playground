@@ -41,7 +41,8 @@ Thumbs.db
 # Demo database contains real financial data - do NOT commit
 tests/fixtures/demo_database/
 # Development/debug scripts
-scripts/
+scripts/*
+!scripts/mcp-telegram-wrapper.mjs
 # Generated test fixtures
 tests/fixtures/mixed-files-db/
 
