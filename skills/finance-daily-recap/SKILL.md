@@ -12,6 +12,8 @@ Default style for this user:
 - Summary-first, not transaction-by-transaction
 - Send every day
 - If there was no spend, keep it short, slightly funny, and encouraging
+- Use clean Telegram-friendly formatting when it adds clarity
+- Use bullets and tasteful emojis sparingly and only when they improve scanability
 
 ## Workflow
 
@@ -117,12 +119,18 @@ Do:
 - Mention essential vs discretionary only if it adds signal
 - Mention pending transactions when present
 - End with a takeaway only if it is meaningful
+- Use simple line breaks and bullets when they make the message easier to scan
+- Use at most 1-3 tasteful emojis when they clearly reinforce the content
+- Prefer emojis with semantic value, like grocery, warning, or trend cues, rather than decoration
 
 Do not:
 - List every transaction by default
 - Fill space with generic advice
 - Force a takeaway when nothing stands out
 - Sound like a budgeting app push notification
+- Add emojis just to make the message feel lively
+- Stack multiple emojis on the same line
+- Turn every recap into a templated block of bullets if plain prose reads better
 
 ## Transaction Listing Policy
 
@@ -173,6 +181,15 @@ Main driver: [top category or merchant].
 
 [Optional meaningful takeaway]
 ```
+
+Formatting guidance:
+- Plain text is fine when the day is simple
+- Use bullets when there are 2-3 distinct drivers or flags worth separating
+- Use emojis only where they carry meaning, for example:
+  - a warning cue for an unusually large charge
+  - a grocery or dining cue for the main driver
+  - a trend cue for above or below baseline
+- Keep emoji use restrained so the message still reads like a sharp personal briefing, not a cheerful app notification
 
 ## Telegram Delivery
 
