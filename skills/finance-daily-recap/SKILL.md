@@ -112,6 +112,7 @@ Treat ambiguous categories conservatively:
 The recap should be brief. It should usually fit in 4-8 lines.
 
 Do:
+- Start with a simple heading that makes it clear the recap is from Copilot Money
 - Lead with the headline: total, count, and label
 - Add one comparison line against baseline
 - Mention the top driver or top category
@@ -170,6 +171,8 @@ Never imply that pending totals are fully settled.
 Use this structure and adapt it to the data:
 
 ```text
+Copilot Money Daily Recap
+
 Yesterday was [quiet/typical/heavy/spiky]: $[total] across [count] purchases.
 
 That was [below/near/above] your recent [weekday] baseline of $[baseline].
@@ -183,6 +186,7 @@ Main driver: [top category or merchant].
 ```
 
 Formatting guidance:
+- Keep the heading simple and stable, for example `Copilot Money Daily Recap`
 - Plain text is fine when the day is simple
 - Use bullets when there are 2-3 distinct drivers or flags worth separating
 - Use emojis only where they carry meaning, for example:
